@@ -24,19 +24,27 @@ build_and_combine() {
         make clean || true
     fi
     
-    # Set proper architectures for simulator platforms
-    if [ -n "$EXTRA_ARGS" ]; then
-        export CC="clang $EXTRA_ARGS"
-        export CXX="clang++ $EXTRA_ARGS"
+    local SDK_PATH=$(xcrun -sdk $SDK_NAME --show-sdk-path)
+    local PLATFORM_FLAGS=""
+    
+    if [[ "$SDK_NAME" == "iphonesimulator" ]]; then
+        PLATFORM_FLAGS="-mios-simulator-version-min=$IOS_MIN_VERSION"
+        # For simulator binaries to be correctly tagged, we often need the target triple
+        if [[ "$EXTRA_ARGS" == *"-arch arm64"* ]]; then
+            PLATFORM_FLAGS="$PLATFORM_FLAGS -target arm64-apple-ios$IOS_MIN_VERSION-simulator"
+        elif [[ "$EXTRA_ARGS" == *"-arch x86_64"* ]]; then
+            PLATFORM_FLAGS="$PLATFORM_FLAGS -target x86_64-apple-ios$IOS_MIN_VERSION-simulator"
+        fi
     else
-        unset CC
-        unset CXX
+        PLATFORM_FLAGS="-miphoneos-version-min=$IOS_MIN_VERSION"
     fi
 
-    # no-shared produces static libraries (.a) exclusively
-    ./Configure $TARGET_NAME no-shared -fembed-bitcode \
-        -miphoneos-version-min=$IOS_MIN_VERSION \
-        -mios-simulator-version-min=$IOS_MIN_VERSION
+    # Set compiler with explicit sysroot and architecture
+    export CC="clang -isysroot $SDK_PATH $EXTRA_ARGS $PLATFORM_FLAGS"
+    export CXX="clang++ -isysroot $SDK_PATH $EXTRA_ARGS $PLATFORM_FLAGS"
+
+    # Important: OpenSSL 3's Configure can be picky. We pass the flags via CC/CXX.
+    ./Configure $TARGET_NAME no-shared
 
     make -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
 
@@ -46,14 +54,14 @@ build_and_combine() {
     # Backup generated headers
     cp -r include/openssl "$TARGET_OUT_DIR/"
     
-    # Combine individual static libraries into a single fat archive
+    # Combine libssl.a and libcrypto.a into a single static library
     echo "Combining libssl.a and libcrypto.a into libopenssl.a via libtool..."
     libtool -static -o "$TARGET_OUT_DIR/libopenssl.a" libcrypto.a libssl.a
 }
 
 # 1. Device (arm64)
-# ios64-xcrun explicitly targets physical devices (arm64)
-build_and_combine "ios64-xcrun" "iphoneos" "device" ""
+# ios64-xcrun targets physical devices
+build_and_combine "ios64-xcrun" "iphoneos" "device" "-arch arm64"
 
 # 2. Simulator (arm64)
 build_and_combine "iossimulator-xcrun" "iphonesimulator" "sim_arm64" "-arch arm64"
@@ -73,7 +81,7 @@ lipo -create -output "$OUT_DIR/simulator/libopenssl.a" \
     "$OUT_DIR/sim_arm64/libopenssl.a" \
     "$OUT_DIR/sim_x86_64/libopenssl.a"
 
-# 5. Combine into XCFramework
+# 5. Create XCFramework
 echo "============================================="
 echo "Creating openssl.xcframework..."
 echo "============================================="
