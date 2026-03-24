@@ -35,6 +35,9 @@ jobs:
 
       - name: Package AAR
         run: |
+          VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
+
           mkdir -p aar-content/jni
           mkdir -p aar-content/META-INF/licenses
           # Copy jniLibs safely
@@ -60,7 +63,7 @@ jobs:
           
           # Pack everything into an AAR file
           cd aar-content
-          zip -r ../openssl-${{ inputs.version }}.aar *
+          zip -r ../openssl-$VERSION.aar *
           cd ..
 
       - name: Checkout Maven Repo
@@ -76,7 +79,9 @@ jobs:
           GROUP_ID="com.xdcobra.openssl"
           ARTIFACT_ID="openssl"
           VERSION="${{ inputs.version }}"
+          VERSION="${VERSION#v}"
           REPO_ROOT="$(pwd)"
+          echo "Maven version: $VERSION"
           
           GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
           ARTIFACT_DIR="$REPO_ROOT/maven-repo/$GROUP_PATH/$ARTIFACT_ID"
