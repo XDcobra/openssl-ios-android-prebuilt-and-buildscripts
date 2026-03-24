@@ -65,9 +65,10 @@ jobs:
           GROUP_ID="com.xdcobra.openssl"
           ARTIFACT_ID="openssl"
           VERSION="${{ inputs.version }}"
+          REPO_ROOT="$(pwd)"
           
           GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
-          ARTIFACT_DIR="maven-repo/$GROUP_PATH/$ARTIFACT_ID"
+          ARTIFACT_DIR="$REPO_ROOT/maven-repo/$GROUP_PATH/$ARTIFACT_ID"
           VERSION_DIR="$ARTIFACT_DIR/$VERSION"
           
           # Ensure directories exist
@@ -150,7 +151,7 @@ jobs:
 
           last_updated = versioning.find('lastUpdated')
           if last_updated is None: last_updated = ET.SubElement(versioning, 'lastUpdated')
-          last_updated.text = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
+          last_updated.text = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')
 
           # Pretty-print XML for readable maven-metadata.xml output
           try:
@@ -185,7 +186,7 @@ jobs:
           cd "$ARTIFACT_DIR"
           md5sum "maven-metadata.xml" | cut -d' ' -f1 > "maven-metadata.xml.md5"
           sha1sum "maven-metadata.xml" | cut -d' ' -f1 > "maven-metadata.xml.sha1"
-          cd -
+          cd "$REPO_ROOT"
           
           # Commit to the maven repository
           cd maven-repo
