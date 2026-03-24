@@ -152,7 +152,24 @@ jobs:
           if last_updated is None: last_updated = ET.SubElement(versioning, 'lastUpdated')
           last_updated.text = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
-          # Register XML declaration manually or via ET
+          # Pretty-print XML for readable maven-metadata.xml output
+          try:
+              ET.indent(tree, space='  ')
+          except AttributeError:
+              # Fallback for older Python versions that do not provide ET.indent
+              def _indent(elem, level=0):
+                  i = '\n' + level * '  '
+                  if len(elem):
+                      if not elem.text or not elem.text.strip():
+                          elem.text = i + '  '
+                      for child in elem:
+                          _indent(child, level + 1)
+                      if not elem.tail or not elem.tail.strip():
+                          elem.tail = i
+                  elif level and (not elem.tail or not elem.tail.strip()):
+                      elem.tail = i
+              _indent(root)
+
           with open(metadata_path, 'w', encoding='utf-8') as f:
               f.write('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n')
               tree.write(f, encoding='unicode')
