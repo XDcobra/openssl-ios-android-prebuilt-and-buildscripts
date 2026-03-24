@@ -29,6 +29,9 @@ API_LEVEL=24
 OUT_DIR="$(pwd)/build/android"
 mkdir -p "$OUT_DIR/include"
 
+OPENSSL_LICENSE_SOURCE="$(pwd)/LICENSE.txt"
+OPENSSL_LICENSE_OUT_DIR="$OUT_DIR/licenses/openssl"
+
 echo "Building for Android (API Level $API_LEVEL)..."
 
 cd openssl
@@ -70,6 +73,15 @@ for i in "${!ABIS[@]}"; do
     cp libcrypto.a "$ABI_LIB/libcrypto.a"
     cp libssl.a "$ABI_LIB/libssl.a"
 done
+
+if [ ! -f "$OPENSSL_LICENSE_SOURCE" ]; then
+    echo "Error: OpenSSL license file not found at $OPENSSL_LICENSE_SOURCE"
+    exit 1
+fi
+
+mkdir -p "$OPENSSL_LICENSE_OUT_DIR"
+cp "$OPENSSL_LICENSE_SOURCE" "$OPENSSL_LICENSE_OUT_DIR/OPENSSL-LICENSE.txt"
+echo "✓ Copied OpenSSL license to $OPENSSL_LICENSE_OUT_DIR/OPENSSL-LICENSE.txt"
 
 echo "============================================="
 echo "Android build completed!"

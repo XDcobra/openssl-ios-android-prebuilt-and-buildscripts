@@ -36,9 +36,20 @@ jobs:
       - name: Package AAR
         run: |
           mkdir -p aar-content/jni
+          mkdir -p aar-content/META-INF/licenses
           # Copy jniLibs safely
           if [ -d android_out/jniLibs ]; then
              cp -r android_out/jniLibs/* aar-content/jni/ || true
+          fi
+
+          # Copy license files into the AAR to satisfy redistribution requirements
+          if [ -d android_out/licenses ]; then
+            cp -r android_out/licenses/* aar-content/META-INF/licenses/ || true
+          fi
+
+          if [ ! -f aar-content/META-INF/licenses/openssl/OPENSSL-LICENSE.txt ]; then
+            echo "Error: Missing OpenSSL license file in Android build output"
+            exit 1
           fi
           
           # Create a minimal AndroidManifest.xml required for AAR validity
