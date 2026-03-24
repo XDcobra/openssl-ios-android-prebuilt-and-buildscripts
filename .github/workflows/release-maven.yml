@@ -175,19 +175,17 @@ jobs:
               tree.write(f, encoding='unicode')
           " "$GROUP_ID" "$ARTIFACT_ID" "$VERSION" "$ARTIFACT_DIR"
 
-          # Function to generate MD5 and SHA1 hashes for a file
-          generate_hashes() {
-              local file=$1
-              if [ -f "\$file" ]; then
-                  md5sum "\$file" | awk '{print $1}' > "\$file.md5"
-                  sha1sum "\$file" | awk '{print $1}' > "\$file.sha1"
-              fi
-          }
+          # Generate checksums
+          cd "$VERSION_DIR"
+          for f in "$ARTIFACT_ID-$VERSION.aar" "$ARTIFACT_ID-$VERSION.pom"; do
+            md5sum "$f" | cut -d' ' -f1 > "${f}.md5"
+            sha1sum "$f" | cut -d' ' -f1 > "${f}.sha1"
+          done
 
-          # Generate Hashes for POM, AAR and metadata
-          generate_hashes "$POM_FILE"
-          generate_hashes "$AAR_FILE"
-          generate_hashes "$ARTIFACT_DIR/maven-metadata.xml"
+          cd "$ARTIFACT_DIR"
+          md5sum "maven-metadata.xml" | cut -d' ' -f1 > "maven-metadata.xml.md5"
+          sha1sum "maven-metadata.xml" | cut -d' ' -f1 > "maven-metadata.xml.sha1"
+          cd -
           
           # Commit to the maven repository
           cd maven-repo
