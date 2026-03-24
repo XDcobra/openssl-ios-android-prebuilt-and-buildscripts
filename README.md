@@ -70,6 +70,20 @@ chmod +x build-ios.sh
 ```
 The output will be located in `build/ios/openssl.xcframework`.
 
+### Building for Android (Windows)
+
+For Windows users, a PowerShell script is provided to build Android binaries using MSYS2 and the Android NDK.
+
+**Prerequisites:**
+- **MSYS2**: Installed with `make` and `perl`.
+- **Android NDK**: Path set in `$env:ANDROID_NDK_HOME`.
+- **PowerShell**: Version 5.1 or 7+.
+
+```powershell
+.\build_openssl_android_rsp.ps1
+```
+The standardized output will be copied to `build/android/` just like the macOS script.
+
 ## CI/CD and Releases
 
 ### Tagging Convention
