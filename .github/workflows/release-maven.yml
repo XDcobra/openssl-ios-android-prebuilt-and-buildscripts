@@ -1,0 +1,102 @@
+name: Release Maven
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    secrets:
+      MAVEN_REPO_PAT:
+        required: true
+
+concurrency:
+  group: release-maven-${{ inputs.version || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  maven_release:
+    name: Deploy to Maven
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Build Repo
+        uses: actions/checkout@v6
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: openssl-android
+
+      - name: Extract Android Target
+        run: |
+          mkdir -p android_out
+          unzip openssl-android.zip -d android_out
+
+      - name: Package AAR
+        run: |
+          mkdir -p aar-content/jni
+          # Copy jniLibs safely
+          if [ -d android_out/jniLibs ]; then
+             cp -r android_out/jniLibs/* aar-content/jni/ || true
+          fi
+          
+          # Create a minimal AndroidManifest.xml required for AAR validity
+          cat << 'EOF' > aar-content/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest package="com.xdcobra.openssl" />
+          EOF
+          
+          # Pack everything into an AAR file
+          cd aar-content
+          zip -r ../openssl-${{ inputs.version }}.aar *
+          cd ..
+
+      - name: Checkout Maven Repo
+        uses: actions/checkout@v6
+        with:
+          repository: XDcobra/maven
+          token: ${{ secrets.MAVEN_REPO_PAT }}
+          path: maven-repo
+
+      - name: Deploy to GitHub Pages Maven
+        run: |
+          # Define Group IDs and Artifact IDs
+          GROUP_ID="com.xdcobra.openssl"
+          ARTIFACT_ID="openssl"
+          VERSION="${{ inputs.version }}"
+          
+          GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
+          VERSION_DIR="maven-repo/$GROUP_PATH/$ARTIFACT_ID/$VERSION"
+          
+          # Ensure directory exists
+          mkdir -p "$VERSION_DIR"
+          
+          # Copy the AAR
+          cp "openssl-$VERSION.aar" "$VERSION_DIR/"
+          
+          # Create POM file
+          POM_FILE="$VERSION_DIR/$ARTIFACT_ID-$VERSION.pom"
+          cat <<EOF > "$POM_FILE"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" 
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" 
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>$GROUP_ID</groupId>
+            <artifactId>$ARTIFACT_ID</artifactId>
+            <version>$VERSION</version>
+            <packaging>aar</packaging>
+            <description>OpenSSL Prebuilt Libraries for Android and iOS</description>
+            <!-- Include dependencies here if needed (e.g. for libcurl) -->
+          </project>
+          EOF
+          
+          # Commit to the maven repository
+          cd maven-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add "$GROUP_PATH/$ARTIFACT_ID/$VERSION/"
+          git commit -m "Publish $GROUP_ID:$ARTIFACT_ID:$VERSION" || echo "No changes to commit"
+          git push

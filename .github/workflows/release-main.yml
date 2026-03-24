@@ -1,0 +1,45 @@
+name: Release Main
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version Tag (e.g. v3.6.1-1). Leave empty to use reference name.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_android:
+    uses: ./.github/workflows/build-android.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+
+  build_ios:
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+
+  release_github:
+    needs: [build_android, build_ios]
+    uses: ./.github/workflows/release-github.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets: inherit
+
+  release_maven:
+    needs: [build_android]
+    uses: ./.github/workflows/release-maven.yml
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets:
+      MAVEN_REPO_PAT: ${{ secrets.MAVEN_REPO_PAT }}

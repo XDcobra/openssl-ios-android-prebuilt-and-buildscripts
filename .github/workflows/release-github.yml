@@ -1,0 +1,47 @@
+name: Release GitHub
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-github-${{ inputs.version || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  github_release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: openssl-android
+
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: openssl-ios
+
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.version }}
+          name: Release ${{ inputs.version }}
+          draft: false
+          prerelease: false
+          files: |
+            openssl-android.zip
+            openssl-ios.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

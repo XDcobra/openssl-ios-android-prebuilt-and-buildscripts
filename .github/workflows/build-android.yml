@@ -1,0 +1,60 @@
+name: Build Android
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+concurrency:
+  group: build-android-${{ inputs.version || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_android:
+    name: Build Android
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Cache Android Build
+        id: cache-android
+        uses: actions/cache@v5
+        with:
+          path: build/android
+          key: ${{ runner.os }}-android-${{ inputs.version }}-${{ hashFiles('build-android.sh', 'openssl/**') }}
+
+      - name: Setup Android NDK
+        if: steps.cache-android.outputs.cache-hit != 'true'
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r29
+          add-to-path: true
+          local-cache: false  # disable local cache to avoid linking errors: https://github.com/nttld/setup-ndk/issues/518#event-16541651206
+
+      - name: Build Android Libraries
+        if: steps.cache-android.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          chmod +x build-android.sh
+          ./build-android.sh
+
+      - name: ZIP Artifacts
+        run: |
+          cd build/android
+          zip -r ../../openssl-android.zip *
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: openssl-android
+          path: openssl-android.zip
+          retention-days: 1

@@ -1,0 +1,52 @@
+name: Build iOS
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+concurrency:
+  group: build-ios-${{ inputs.version || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_ios:
+    name: Build iOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Cache iOS Build
+        id: cache-ios
+        uses: actions/cache@v5
+        with:
+          path: build/ios
+          key: ${{ runner.os }}-ios-${{ inputs.version }}-${{ hashFiles('build-ios.sh', 'openssl/**') }}
+
+      - name: Select Xcode
+        if: steps.cache-ios.outputs.cache-hit != 'true'
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build iOS Libraries
+        if: steps.cache-ios.outputs.cache-hit != 'true'
+        run: |
+          chmod +x build-ios.sh
+          ./build-ios.sh
+
+      - name: ZIP Artifacts
+        run: |
+          cd build/ios
+          zip -r ../../openssl-ios.zip openssl.xcframework
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: openssl-ios
+          path: openssl-ios.zip
+          retention-days: 1
