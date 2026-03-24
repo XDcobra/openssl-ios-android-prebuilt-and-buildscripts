@@ -67,13 +67,15 @@ jobs:
           VERSION="${{ inputs.version }}"
           
           GROUP_PATH=$(echo "$GROUP_ID" | tr '.' '/')
-          VERSION_DIR="maven-repo/$GROUP_PATH/$ARTIFACT_ID/$VERSION"
+          ARTIFACT_DIR="maven-repo/$GROUP_PATH/$ARTIFACT_ID"
+          VERSION_DIR="$ARTIFACT_DIR/$VERSION"
           
-          # Ensure directory exists
+          # Ensure directories exist
           mkdir -p "$VERSION_DIR"
           
           # Copy the AAR
-          cp "openssl-$VERSION.aar" "$VERSION_DIR/"
+          AAR_FILE="$VERSION_DIR/$ARTIFACT_ID-$VERSION.aar"
+          cp "openssl-$VERSION.aar" "$AAR_FILE"
           
           # Create POM file
           POM_FILE="$VERSION_DIR/$ARTIFACT_ID-$VERSION.pom"
@@ -88,15 +90,93 @@ jobs:
             <version>$VERSION</version>
             <packaging>aar</packaging>
             <description>OpenSSL Prebuilt Libraries for Android and iOS</description>
-            <!-- Include dependencies here if needed (e.g. for libcurl) -->
+            <!-- Include dependencies here if needed -->
           </project>
           EOF
+          
+          # Update maven-metadata.xml
+          python3 -c "
+          import os, sys, datetime
+          import xml.etree.ElementTree as ET
+
+          group_id = sys.argv[1]
+          artifact_id = sys.argv[2]
+          version = sys.argv[3]
+          base_dir = sys.argv[4]
+
+          metadata_path = os.path.join(base_dir, 'maven-metadata.xml')
+
+          versions = []
+          if os.path.exists(base_dir):
+              for item in os.listdir(base_dir):
+                  if os.path.isdir(os.path.join(base_dir, item)) and not item.startswith('.'):
+                      versions.append(item)
+
+          if version not in versions:
+              versions.append(version)
+
+          def version_key(v):
+              import re
+              return [int(x) if x.isdigit() else x for x in re.split(r'[^0-9A-Za-z]', v)]
+          versions.sort(key=version_key)
+
+          if os.path.exists(metadata_path):
+              tree = ET.parse(metadata_path)
+              root = tree.getroot()
+          else:
+              root = ET.Element('metadata')
+              ET.SubElement(root, 'groupId').text = group_id
+              ET.SubElement(root, 'artifactId').text = artifact_id
+              tree = ET.ElementTree(root)
+
+          versioning = root.find('versioning')
+          if versioning is None:
+              versioning = ET.SubElement(root, 'versioning')
+
+          v_latest = versioning.find('latest')
+          if v_latest is None: v_latest = ET.SubElement(versioning, 'latest')
+          v_latest.text = version
+
+          v_release = versioning.find('release')
+          if v_release is None: v_release = ET.SubElement(versioning, 'release')
+          v_release.text = version
+
+          versions_node = versioning.find('versions')
+          if versions_node is None: versions_node = ET.SubElement(versioning, 'versions')
+          
+          versions_node.clear()
+          for v in versions:
+              ET.SubElement(versions_node, 'version').text = v
+
+          last_updated = versioning.find('lastUpdated')
+          if last_updated is None: last_updated = ET.SubElement(versioning, 'lastUpdated')
+          last_updated.text = datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
+
+          # Register XML declaration manually or via ET
+          with open(metadata_path, 'w', encoding='utf-8') as f:
+              f.write('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n')
+              tree.write(f, encoding='unicode')
+          " "$GROUP_ID" "$ARTIFACT_ID" "$VERSION" "$ARTIFACT_DIR"
+
+          # Function to generate MD5 and SHA1 hashes for a file
+          generate_hashes() {
+              local file=\$1
+              if [ -f "\$file" ]; then
+                  md5sum "\$file" | awk '{print \$1}' > "\$file.md5"
+                  sha1sum "\$file" | awk '{print \$1}' > "\$file.sha1"
+              fi
+          }
+
+          # Generate Hashes for POM, AAR and metadata
+          generate_hashes "$POM_FILE"
+          generate_hashes "$AAR_FILE"
+          generate_hashes "$ARTIFACT_DIR/maven-metadata.xml"
           
           # Commit to the maven repository
           cd maven-repo
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          git add "$GROUP_PATH/$ARTIFACT_ID/$VERSION/"
+          git add "$GROUP_PATH/$ARTIFACT_ID/"
           git commit -m "Publish $GROUP_ID:$ARTIFACT_ID:$VERSION" || echo "No changes to commit"
           git push
