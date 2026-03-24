@@ -5,7 +5,20 @@ IOS_MIN_VERSION="12.0"
 OUT_DIR="$(pwd)/build/ios"
 mkdir -p "$OUT_DIR"
 
-OPENSSL_LICENSE_SOURCE="$(pwd)/LICENSE.txt"
+find_first_existing_file() {
+    for candidate in "$@"; do
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+OPENSSL_LICENSE_SOURCE="$(find_first_existing_file \
+    "$(pwd)/LICENSE.txt" \
+    "$(pwd)/openssl/LICENSE.txt" \
+    "$(pwd)/openssl/LICENSE")"
 
 echo "Building iOS binaries (Min iOS $IOS_MIN_VERSION)..."
 
@@ -94,7 +107,7 @@ xcodebuild -create-xcframework \
     -library "$OUT_DIR/simulator/libopenssl.a" -headers "$OUT_DIR/device/openssl" \
     -output "$XCFRAMEWORK_DIR"
 
-if [ ! -f "$OPENSSL_LICENSE_SOURCE" ]; then
+if [ -z "$OPENSSL_LICENSE_SOURCE" ] || [ ! -f "$OPENSSL_LICENSE_SOURCE" ]; then
     echo "Error: OpenSSL license file not found at $OPENSSL_LICENSE_SOURCE"
     exit 1
 fi
