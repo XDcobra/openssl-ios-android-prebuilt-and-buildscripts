@@ -30,7 +30,8 @@ dependencies {
 ## Features
 
 - **Android Support**: Compiles for `armeabi-v7a`, `arm64-v8a`, `x86`, and `x86_64`.
-  - Generates both Shared (`.so`) and Static (`.a`) libraries.
+  - **Shared libraries** (`libcrypto.so`, `libssl.so` per ABI) are the primary output — use these when linking other native code (e.g. libcurl) dynamically against OpenSSL.
+  - **Static archives** (`.a`) are also included for optional static linking.
   - Targets Android API Level 24.
 - **iOS Support**: Compiles for physical devices (`arm64`) and simulators (`arm64`, `x86_64`).
   - Generates a unified **`openssl.xcframework`** (Umbrella Framework).

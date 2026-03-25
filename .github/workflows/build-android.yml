@@ -47,6 +47,19 @@ jobs:
           chmod +x build-android.sh
           ./build-android.sh
 
+      - name: Verify shared OpenSSL per ABI
+        run: |
+          set -e
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            dir="build/android/jniLibs/$abi"
+            if [ ! -f "$dir/libcrypto.so" ] || [ ! -f "$dir/libssl.so" ]; then
+              echo "Error: missing libcrypto.so or libssl.so in $dir"
+              ls -la "$dir" 2>/dev/null || true
+              exit 1
+            fi
+          done
+          echo "OK: shared OpenSSL .so files present for all ABIs"
+
       - name: ZIP Artifacts
         run: |
           cd build/android

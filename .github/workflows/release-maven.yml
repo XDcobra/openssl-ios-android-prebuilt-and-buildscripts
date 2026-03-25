@@ -33,6 +33,19 @@ jobs:
           mkdir -p android_out
           unzip openssl-android.zip -d android_out
 
+      - name: Verify shared OpenSSL libraries (AAR input)
+        run: |
+          set -e
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            dir="android_out/jniLibs/$abi"
+            if [ ! -f "$dir/libcrypto.so" ] || [ ! -f "$dir/libssl.so" ]; then
+              echo "Error: expected libcrypto.so and libssl.so in $dir"
+              ls -la "$dir" 2>/dev/null || echo "(missing dir)"
+              exit 1
+            fi
+          done
+          echo "OK: shared libcrypto.so / libssl.so present for all ABIs"
+
       - name: Package AAR
         run: |
           VERSION="${{ inputs.version }}"

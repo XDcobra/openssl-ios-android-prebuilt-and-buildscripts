@@ -1,5 +1,10 @@
 #!/bin/bash
 set -e
+#
+# Android OpenSSL: produces shared libraries (libcrypto.so, libssl.so) per ABI — these are what
+# consumers like libcurl should link against when using dynamic TLS. The Makefile also emits
+# static archives (.a); we copy both so the Maven AAR can serve shared-first workflows while
+# optional static linking remains available until all downstreams migrate.
 
 # Verify Android NDK
 if [ -z "$ANDROID_NDK_ROOT" ]; then
@@ -65,7 +70,7 @@ for i in "${!ABIS[@]}"; do
         make clean || true
     fi
     
-    # Configure OpenSSL for target architecture
+    # Configure OpenSSL for target architecture (shared = real .so SONAMEs; .a still built)
     ./Configure $TARGET -D__ANDROID_API__=$API_LEVEL shared
     
     # Compile using all available CPU cores
